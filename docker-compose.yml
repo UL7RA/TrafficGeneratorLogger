@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+    interceptor:
+        build: ./interceptor
+        container_name: interceptor
+        volumes:
+            - ./interceptor/files:/log
+        environment:
+            MYSQL_HOST: database
+            MYSQL_USER: root
+            MYSQL_PASSWORD: dbpass
+            MYSQL_DB: maindb
+
+    database:
+        image: mysql:8.0.23
+        container_name: mysql_database
+        volumes:
+            - database:/var/lib/mysql
+            - ./database/init.sql:/data/application/init.sql
+        command: --init-file /data/application/init.sql
+        environment:
+            MYSQL_ROOT_PASSWORD: dbpass
+            MYSQL_DATABASE: maindb
+        cap_add:
+            - SYS_NICE  # suppresses mbind operation not permitted message
+
+    exporter1:
+        image: prom/mysqld-exporter:v0.12.1
+        container_name: not_my_exporter
+        ports:
+            - "9104:9104"
+        environment:
+            DATA_SOURCE_NAME: root:dbpass@(database:3306)/maindb
+
+    prometheus:
+        image: prom/prometheus:v2.26.0
+        container_name: prometheus
+        ports:
+            - "9090:9090"
+        volumes:
+            - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+            - prometheus:/prometheus
+
+    pyexporter:
+        build: ./pymysqlhostexporter
+        container_name: my_exporter
+        volumes:
+            - ./pymysqlhostexporter/files:/log
+        environment:
+            MYSQL_HOST: database
+            MYSQL_USER: root
+            MYSQL_PASSWORD: dbpass
+            MYSQL_DB: maindb
+        ports:
+            - "8000:8000"
+
+volumes:
+    database:
+        
+    prometheus:
+
